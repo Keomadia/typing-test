@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Typing Test</title>
+  <style>
+
+    :root{
+      --primary-color: #ffa500;
+      --secondary-color: #1a1a1a;
+      --text-color: #f1f1f1;
+      --correct-color: #00ff9c;
+      --incorrect-color: #ff4f4f;
+    }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #333;
+      color: #f1f1f1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    #view-progress {
+      background-color: var(--primary-color);
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-bottom: 1rem;
+    }
+
+    .top-bar {
+      width: 100%;
+      background-color: transparent;
+      padding: 10px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      
+    }
+
+    select{
+      background-color: transparent;
+      color: var(--primary-color);
+      border: 2px solid var(--text-color);
+      border-radius: none;
+      padding: 10px 20px;
+      min-width: 100px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    #header {
+      font-size: 2.4rem;
+      margin-bottom: 1rem;
+      color: var(--primary-color);
+    }
+    #word-container {
+      font-size: 1.8rem;
+      letter-spacing: 0.05em;
+      word-spacing: 2rem;
+      width: 60%;
+      height: calc(3.5rem * 4);
+      overflow-y: hidden;
+      line-height: 4.5rem;
+      text-align: justify;
+      position: relative;
+      background-color: #69696917;
+      padding: 15px;
+      
+    }
+    #input {
+      background: none;
+      border: 2px solid var(--primary-color);
+      outline: none;
+      border-radius: 10px;
+      margin-top: 20px;
+      font-size: 1.5rem;
+      color: var(--primary-color);
+      width: 30%;
+      padding: 10px;
+      text-align: center;
+    }
+    #stats, button {
+      margin-top: 1rem;
+      font-size: 1rem;
+      color: #ccc;
+    }
+    .correct { color: #00ff9c; }
+    .incorrect { color: #ff4f4f; }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: #2b2b2b;
+      padding: 20px;
+      width: 90%;
+      max-width: 900px;
+      border-radius: 8px;
+      overflow: auto;
+      max-height: 90vh;
+    }
+    .close { float: right; color: #aaa; cursor: pointer; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #555;
+      text-align: center;
+    }
+    th {
+      cursor: pointer;
+      color: var(--primary-color);
+    }
+    canvas { background: #333; margin-top: 10px; }
+
+    #reset-btn {
+      background-color: transparent;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-left: 10px;
+    } 
+
+    #stats {
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 10px 20px;
+      font-size: 1.2rem;
+      border-radius: 5px;
+      color: var(--primary-color);
+    }
+
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <h1 id="header">Typing Test</h1>
+
+    <div>
+      
+
+      <button id="reset-btn" >♻️</button>
+      <select id="time-range">
+        <option value="15">15 seconds</option>
+        <option value="30">30 seconds</option>
+        <option value="60" selected>60 seconds</option>
+        <option value="300">5 minutes</option>
+      </select>
+        <button id="view-progress">View Progress</button>
+    </div>
+  </div>
+    <div id="stats"><span id="time"></span>s | <span id="wpm">0</span> WPM | <span id="accuracy">100%</span> Accuracy</div>
+
+  <div id="word-container"></div>
+  <input type="text" id="input" autofocus />
+
+  <div id="result-container"></div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="close-modal">&times;</span>
+      <h2>Typing Progress</h2>
+      <label for="time-range">View:</label>
+      <select id="time-range">
+        <option value="5">Last 5</option>
+        <option value="10">Last 10</option>
+        <option value="all" selected>All</option>
+      </select>
+      <canvas id="chart" width="800" height="300"></canvas>
+      <table id="progress-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('wpm')">WPM</th>
+            <th onclick="sortTable('accuracy')">Accuracy</th>
+            <th onclick="sortTable('testTime')">Time (s)</th>
+            <th onclick="sortTable('timestamp')">Timestamp</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+
+      const realWords = [
+        "the", "be", "to", "of", "and", "a", "in", "that", "have", "I",
+        "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
+        "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
+        "or", "an", "will", "my", "one", "all", "would", "there", "their", "what",
+        "so", "up", "out", "if", "about", "who", "get", "which", "go", "me",
+        "when", "make", "can", "like", "time", "no", "just", "him", "know", "take",
+        "people", "into", "year", "your", "good", "some", "could", "them", "see", "other",
+        "than", "then", "now", "look", "only", "come", "its", "over", "think", "also",
+        "back", "after", "use", "two", "how", "our", "work", "first", "well", "way",
+        "even", "new", "want", "because", "any", "these", "give", "day", "most", "us",
+        "is", "are", "was", "were", "has", "had", "did", "been", "more", "such",
+        "very", "through", "just", "much", "many", "still", "before", "should", "must", "might",
+        "right", "place", "great", "too", "same", "last", "long", "while", "life", "man",
+        "child", "world", "school", "state", "family", "group", "country", "week", "case", "company",
+        "system", "program", "question", "work", "number", "night", "point", "home", "water", "room",
+        "mother", "area", "money", "story", "fact", "month", "lot", "right", "study", "book",
+        "eye", "job", "word", "business", "issue", "side", "kind", "head", "house", "service",
+        "friend", "father", "power", "hour", "game", "line", "end", "member", "law", "car",
+        "city", "community", "name", "president", "team", "minute", "idea", "kid", "body", "information",
+        "face", "level", "office", "door", "health", "person", "art", "war", "history", "party",
+        "result", "change", "morning", "reason", "research", "girl", "guy", "moment", "air", "teacher",
+        "force", "education", "foot", "boy", "age", "policy", "process", "music", "market", "sense",
+        "nation", "plan", "college", "interest", "death", "experience", "effect", "use", "class", "control",
+        "care", "field", "development", "role", "effort", "rate", "heart", "drug", "show", "leader",
+        "light", "voice", "wife", "police", "mind", "price", "report", "decision", "son", "view",
+        "relationship", "town", "road", "arm", "difference", "value", "building", "action", "model", "season",
+        "society", "tax", "director", "position", "player", "record", "paper", "space", "ground", "form",
+        "event", "official", "matter", "center", "couple", "site", "project", "activity", "star", "table",
+        "need", "court", "oil", "situation", "cost", "industry", "figure", "street", "image", "phone",
+        "data", "picture", "practice", "piece", "land", "product", "doctor", "wall", "patient", "worker",
+        "news", "test", "movie", "north", "love", "support", "technology", "step", "baby", "computer"
+      ];
+
+
+
+    const words = [...Array(300)].map(() => realWords[Math.floor(Math.random() * realWords.length)]);
+
+    const input = document.getElementById("input");
+    const wordContainer = document.getElementById("word-container");
+    const timeEl = document.getElementById("time");
+    const wpmEl = document.getElementById("wpm");
+    const modal = document.getElementById("modal");
+    const openBtn = document.getElementById("view-progress");
+    const closeBtn = document.getElementById("close-modal");
+    const tableBody = document.querySelector("#progress-table tbody");
+    const chartCtx = document.getElementById("chart").getContext("2d");
+    const timeRange = document.getElementById("time-range");
+    const resetBtn = document.getElementById("reset-btn");
+
+
+    let chart;
+    let timer = 60, interval, started = false, currentWord = 0;
+    let typedWords = 0, correctChars = 0, incorrectChars = 0, totalChars = 0;
+    let startTime;
+    let selectedTestDuration = parseInt(timeRange.value); 
+    timeEl.textContent = timer;
+    let lastIncorrectCount = 0;
+
+
+    function setTimerCount() {
+    selectedTestDuration = parseInt(timeRange.value);
+      timer = selectedTestDuration;
+      timeEl.textContent = timer;
+      resetTest();
+    };
+
+    timeRange.addEventListener("change",setTimerCount);
+
+
+    function renderWords() {
+      wordContainer.innerHTML = words.map((word, i) => `<span id="word-${i}">${word}</span>`).join(' ');
+    }
+
+    function startTimer() {
+      startTime = Date.now(); 
+      interval = setInterval(() => {
+        timer--;
+        timeEl.textContent = timer;
+        if (timer <= 0) {
+          clearInterval(interval);
+          input.disabled = true;
+          saveProgress();
+        }
+      }, 1000);
+    }
+
+
+    input.addEventListener("input", () => {
+        if (!started) {
+          started = true;
+          startTimer();
+        }
+
+        const typed = input.value;
+        const current = words[currentWord];
+        const span = document.getElementById(`word-${currentWord}`);
+
+        // Count incorrect characters in real-time
+        let incorrectNow = 0;
+        for (let i = 0; i < typed.length; i++) {
+          if (typed[i] !== current[i]) incorrectNow++;
+        }
+
+        incorrectChars = incorrectChars - lastIncorrectCount + incorrectNow;
+        lastIncorrectCount = incorrectNow;
+
+        // Highlight mistyped words in red
+        if (current.startsWith(typed)) {
+          span.className = "";
+        } else {
+          span.className = "incorrect";
+        }
+
+     
+        if (typed.endsWith(" ")) {
+          const trimmedTyped = typed.trim();
+
+          // Accuracy calculations
+          if (trimmedTyped === current) {
+            span.className = "correct";
+            typedWords++;
+            correctChars += current.length;
+          } else {
+            span.className = "incorrect";
+            for (let i = 0; i < current.length; i++) {
+              if (trimmedTyped[i] === current[i]) correctChars++;
+            }
+          }
+
+          totalChars += current.length;
+          currentWord++;
+          input.value = ""; 
+          scrollToWord(currentWord);
+          updateWPM();
+          updateAccuracy();
+          lastIncorrectCount = 0; 
+        } else {
+          updateAccuracy(); 
+        }
+      });
+
+
+    function scrollToWord(index) {
+      const span = document.getElementById(`word-${index}`);
+      if (span) {
+        const offsetTop = span.offsetTop;
+        wordContainer.scrollTop = offsetTop - wordContainer.clientHeight / 3;
+      }
+    }
+
+    function updateWPM() {
+      const elapsedTimeMs = Date.now() - startTime;
+      const minutes = elapsedTimeMs / 1000 / 60;
+      wpmEl.textContent = minutes > 0 ? Math.round(typedWords / minutes) : 0;
+    }
+
+    function updateAccuracy() {
+      const totalTyped = correctChars + incorrectChars;
+      const acc = totalTyped > 0 ? Math.round((correctChars / totalTyped) * 100) : 100;
+      document.getElementById("accuracy").textContent = `${acc}%`;
+    }
+
+
+    function saveProgress() {
+      const resultContainer = document.getElementById("result-container");
+      const resultText2 = `WPM: ${wpmEl.textContent}`;
+
+      resultContainer.innerHTML = `<p>${resultText2}</p>`;
+      input.disabled = true;
+      
+  //     const accuracy = correctChars + incorrectChars > 0
+  // ? Math.round((correctChars / (correctChars + incorrectChars)) * 100)
+  //   : 0;
+
+  const accuracy = 0
+       const wpm = parseInt(wpmEl.textContent);
+      const testTime = selectedTestDuration;
+      const timestamp = new Date().toISOString();
+      const entry = { wpm, accuracy, testTime, timestamp };
+
+      const history = JSON.parse(localStorage.getItem("progress") || "[]");
+      history.push(entry);
+      localStorage.setItem("progress", JSON.stringify(history));
+    }
+
+
+    function renderTable() {
+      tableBody.innerHTML = "";
+      const data = JSON.parse(localStorage.getItem("progress") || "[]");
+      recentData = data.slice(-10); 
+      for (const item of recentData) {
+        const row = `<tr>
+          <td>${item.wpm}</td>
+          <td>${item.accuracy}%</td>
+          <td>${item.testTime}s</td>
+          <td>${new Date(item.timestamp).toLocaleString()}</td>
+        </tr>`;
+        tableBody.innerHTML += row;
+      }
+    }
+
+    function renderChart() {
+      let data = JSON.parse(localStorage.getItem("progress") || "[]");
+      const range = document.getElementById("time-range").value;
+      if (range !== "all") data = data.slice(-parseInt(range));
+      const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString());
+      const values = data.map(d => d.wpm);
+      if (chart) chart.destroy();
+      chart = new Chart(chartCtx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'WPM Over Time',
+            data: values,
+            borderColor: 'var(--primary-color)',
+            backgroundColor: 'rgba(255,165,0,0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function sortTable(by) {
+      const data = JSON.parse(localStorage.getItem("progress") || "[]");
+      data.sort((a, b) => {
+        if (by === "timestamp") return new Date(a[by]) - new Date(b[by]);
+        return b[by] - a[by];
+      });
+      localStorage.setItem("progress", JSON.stringify(data));
+      renderTable();
+      renderChart();
+    }
+
+    openBtn.onclick = () => {
+      modal.style.display = "flex";
+      renderTable();
+      renderChart();
+    };
+    closeBtn.onclick = () => modal.style.display = "none";
+    document.getElementById("time-range").addEventListener("change", renderChart);
+
+    resetTest = () => {
+      clearInterval(interval);
+      timer = selectedTestDuration;
+      timeEl.textContent = timer;
+      input.value = "";
+      wordContainer.innerHTML = "";
+      currentWord = 0;
+      
+      lastIncorrectCount = 0;
+      typedWords = 0;
+      correctChars = 0;
+      incorrectChars = 0;
+      totalChars = 0;
+      started = false;
+      wpmEl.textContent = "0";
+      renderWords();
+      input.disabled = false;
+      document.getElementById("result-container").innerHTML = "";
+    };
+
+    resetBtn.onclick = () => {
+      resetTest();
+    };
+
+    renderWords();
+
+    saveToJson = () => {
+      const data = JSON.parse(localStorage.getItem("progress") || "[]");
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "typing_test_progress.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    
+    // const saveButton = document.createElement("button");
+    // saveButton.textContent = "Save Progress to JSON";
+    // saveButton.style.marginTop = "1rem";
+    // saveButton.style.backgroundColor = "var(--primary-color)";
+    // saveButton.style.color = "#000";
+    // saveButton.style.border = "none";
+    // saveButton.style.padding = "10px 20px";
+
+
+    // saveButton.onclick = saveToJson;
+    // document.body.appendChild(saveButton);
+  </script>
+</body>
+</html>
